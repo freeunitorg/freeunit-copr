@@ -23,8 +23,10 @@
 #   - RELEASE auto-generated for snapshots:
 #       0.<UTC timestamp>.git<short sha>
 
-UPSTREAM_TARBALL ?= https://github.com/freeunitorg/freeunit/archive/$(UPSTREAM_REF).tar.gz
+UPSTREAM_REPO ?= https://github.com/freeunitorg/freeunit.git
 UPSTREAM_REF ?= master
+
+UPSTREAM_GIT_REF := $(patsubst refs/tags/%,%,$(patsubst refs/heads/%,%,$(UPSTREAM_REF)))
 
 TOPDIR := $(CURDIR)
 BUILD_DIR := $(TOPDIR)/_build
@@ -36,11 +38,8 @@ srpm:
 	rm -rf "$(BUILD_DIR)"
 	mkdir -p "$(BUILD_DIR)"
 
-	curl -L -o "$(BUILD_DIR)/freeunit.tar.gz" "$(UPSTREAM_TARBALL)"
-
-	tar -xzf "$(BUILD_DIR)/freeunit.tar.gz" -C "$(BUILD_DIR)"
-
-	mv "$(BUILD_DIR)"/freeunit-* "$(WORKTREE)"
+	dnf -y install git libxml2 libxslt
+	git clone --depth 1 --branch "$(UPSTREAM_GIT_REF)" "$(UPSTREAM_REPO)" "$(WORKTREE)"
 
 	VERSION="$$(. "$(WORKTREE)/version" && echo $$NXT_VERSION)"; \
 	if echo "$(UPSTREAM_REF)" | grep -q '^refs/tags/'; then \
