@@ -22,6 +22,10 @@
 #   - VERSION is read from upstream version file
 #   - RELEASE auto-generated for snapshots:
 #       0.<UTC timestamp>.git<short sha>
+#
+# Tarball note: upstream pkg/rpm still archives as unit-%{version}/ but the spec
+# Name is freeunit, so %setup expects freeunit-%{version}/. We rename after
+# upstream's make until that is fixed in freeunit (see pkg/rpm Makefile tar transform).
 
 UPSTREAM_REPO ?= https://github.com/freeunitorg/freeunit.git
 UPSTREAM_REF ?= master
@@ -52,7 +56,21 @@ srpm:
 		VERSION="$$VERSION" \
 		RELEASE="$$RELEASE" \
 		specs \
-		"rpmbuild/SOURCES/unit-$$VERSION.tar.gz"
+		"rpmbuild/SOURCES/unit-$$VERSION.tar.gz"; \
+	SRCDIR="$(WORKTREE)/pkg/rpm/rpmbuild/SOURCES"; \
+	TMP=$$(mktemp -d); \
+	tar -xzf "$$SRCDIR/unit-$$VERSION.tar.gz" -C "$$TMP"; \
+	if test -d "$$TMP/unit-$$VERSION"; then \
+		mv "$$TMP/unit-$$VERSION" "$$TMP/freeunit-$$VERSION"; \
+		tar -czf "$$SRCDIR/unit-$$VERSION.tar.gz" -C "$$TMP" "freeunit-$$VERSION"; \
+	elif test -d "$$TMP/freeunit-$$VERSION"; then \
+		: tarball already matches spec Name freeunit layout; \
+	else \
+		echo >&2 "Tarball top directory is neither unit-$$VERSION nor freeunit-$$VERSION"; \
+		ls -la "$$TMP"; \
+		exit 1; \
+	fi; \
+	rm -rf "$$TMP"
 
 	mkdir -p "$(outdir)"
 
