@@ -50,7 +50,8 @@ srpm:
 	$(MAKE) -C "$(WORKTREE)/pkg/rpm" \
 		VERSION="$$VERSION" \
 		RELEASE="$$RELEASE" \
-		specs
+		specs \
+		"rpmbuild/SOURCES/unit-$$VERSION.tar.gz"
 
 	mkdir -p "$(outdir)"
 
