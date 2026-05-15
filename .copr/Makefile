@@ -31,6 +31,7 @@ UPSTREAM_GIT_REF := $(patsubst refs/tags/%,%,$(patsubst refs/heads/%,%,$(UPSTREA
 TOPDIR := $(CURDIR)
 BUILD_DIR := $(TOPDIR)/_build
 WORKTREE := $(BUILD_DIR)/freeunit
+UPSTREAM_RPMSOURCES := $(WORKTREE)/pkg/rpm/rpmbuild/SOURCES
 
 SNAPSHOT_STAMP := $(shell date -u +%Y%m%d%H%M)
 
@@ -56,10 +57,9 @@ srpm:
 	mkdir -p "$(outdir)"
 
 	cp "$(WORKTREE)"/pkg/rpm/rpmbuild/SPECS/unit.spec "$(TOPDIR)/unit.spec"
-	cp "$(WORKTREE)"/pkg/rpm/rpmbuild/SOURCES/unit-*.tar.gz "$(TOPDIR)/"
 
 	rpmbuild -bs \
-		--define "_sourcedir $(TOPDIR)" \
+		--define "_sourcedir $(UPSTREAM_RPMSOURCES)" \
 		--define "_specdir $(TOPDIR)" \
 		--define "_srcrpmdir $(outdir)" \
 		"$(TOPDIR)/unit.spec"
