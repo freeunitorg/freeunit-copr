@@ -26,6 +26,12 @@
 # Tarball note: upstream pkg/rpm still archives as unit-%{version}/ but the spec
 # Name is freeunit, so %setup expects freeunit-%{version}/. We rename after
 # upstream's make until that is fixed in freeunit (see pkg/rpm Makefile tar transform).
+#
+# Contrib tarballs: COPR mock has no %build HTTP. Fresh clone is scanned by
+# .copr/gen_contrib_fetch.py, which emits BUILD_DIR/contrib-fetch.sh (curl calls
+# derived from upstream pkg/contrib Makefiles, not a fixed package list). Then
+# patch_upstream.py disables in-tree curl/wget. Run generated script, then
+# `make -C pkg/contrib fetch` for SHA512 + git-based libunit-wasm. SKIP_CONTRIB_NET.
 
 UPSTREAM_REPO ?= https://github.com/freeunitorg/freeunit.git
 UPSTREAM_REF ?= master
@@ -43,8 +49,13 @@ srpm:
 	rm -rf "$(BUILD_DIR)"
 	mkdir -p "$(BUILD_DIR)"
 
-	dnf -y install git libxml2 libxslt
+	dnf -y install git libxml2 libxslt xz curl wget python3
 	git clone --depth 1 --branch "$(UPSTREAM_GIT_REF)" "$(UPSTREAM_REPO)" "$(WORKTREE)"
+	mkdir -p "$(WORKTREE)/pkg/contrib/tarballs"
+	python3 "$(TOPDIR)/.copr/gen_contrib_fetch.py" --worktree "$(WORKTREE)" --out "$(BUILD_DIR)/contrib-fetch.sh"
+	python3 "$(TOPDIR)/.copr/patch_upstream.py" "$(WORKTREE)"
+	bash "$(BUILD_DIR)/contrib-fetch.sh" "$(WORKTREE)"
+	$(MAKE) -C "$(WORKTREE)/pkg/contrib" fetch
 
 	VERSION="$$(. "$(WORKTREE)/version" && echo $$NXT_VERSION)"; \
 	if echo "$(UPSTREAM_REF)" | grep -q '^refs/tags/'; then \
