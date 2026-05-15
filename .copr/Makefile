@@ -23,10 +23,11 @@
 #   - RELEASE auto-generated for snapshots:
 #       0.<UTC timestamp>.git<short sha>
 
-UPSTREAM_REPO ?= https://github.com/freeunitorg/freeunit/archive/$(UPSTREAM_REF).tar.gz
+UPSTREAM_TARBALL ?= https://github.com/freeunitorg/freeunit/archive/$(UPSTREAM_REF).tar.gz
 UPSTREAM_REF ?= master
 
-BUILD_DIR ?= _build
+TOPDIR := $(CURDIR)
+BUILD_DIR := $(TOPDIR)/_build
 WORKTREE := $(BUILD_DIR)/freeunit
 
 SNAPSHOT_STAMP := $(shell date -u +%Y%m%d%H%M)
@@ -35,8 +36,7 @@ srpm:
 	rm -rf "$(BUILD_DIR)"
 	mkdir -p "$(BUILD_DIR)"
 
-	curl -L -o "$(BUILD_DIR)/freeunit.tar.gz" \
-		"https://github.com/freeunitorg/freeunit/archive/$(UPSTREAM_REF).tar.gz"
+	curl -L -o "$(BUILD_DIR)/freeunit.tar.gz" "$(UPSTREAM_TARBALL)"
 
 	tar -xzf "$(BUILD_DIR)/freeunit.tar.gz" -C "$(BUILD_DIR)"
 
@@ -55,15 +55,14 @@ srpm:
 
 	mkdir -p "$(outdir)"
 
-	cp "$(WORKTREE)"/pkg/rpm/rpmbuild/SPECS/unit.spec .
-	cp "$(WORKTREE)"/pkg/rpm/rpmbuild/SOURCES/unit-*.tar.gz .
+	cp "$(WORKTREE)"/pkg/rpm/rpmbuild/SPECS/unit.spec "$(TOPDIR)/unit.spec"
+	cp "$(WORKTREE)"/pkg/rpm/rpmbuild/SOURCES/unit-*.tar.gz "$(TOPDIR)/"
 
 	rpmbuild -bs \
-		--define "_sourcedir $(PWD)" \
-		--define "_specdir $(PWD)" \
+		--define "_sourcedir $(TOPDIR)" \
+		--define "_specdir $(TOPDIR)" \
 		--define "_srcrpmdir $(outdir)" \
-		unit.spec
+		"$(TOPDIR)/unit.spec"
 
 clean:
-	rm -rf "$(BUILD_DIR)" unit.spec unit-*.tar.gz
-
+	rm -rf "$(BUILD_DIR)" "$(TOPDIR)/unit.spec" "$(TOPDIR)/unit-*.tar.gz"
