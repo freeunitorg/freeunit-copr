@@ -1,4 +1,11 @@
 /_build/
+/_build_check/
 /_test_clone/
 /unit.spec
 /unit-*.tar.gz
+
+__pycache__/
+*.pyc
+
+.copr/__pycache__/
+.cursor/

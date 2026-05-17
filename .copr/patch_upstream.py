@@ -48,6 +48,31 @@ SKIP_BLOCK = (
 
 NEEDLE = "include $(SRC)/*/Makefile\n\n# Targets\n"
 
+WASI_SKIP_MARKER = "# COPR: wasi-sysroot disabled"
+
+# unit.spec.in — libunit-wasm needs wasi-sysroot; disable both until WASI tarball/SUMS align.
+SPEC_LIBUNIT_WASM_BUILD = """%if (0%{?fedora}) || (0%{?rhel} >= 8) || (0%{?amzn2})
+%{__make} %{?_smp_mflags} -C pkg/contrib .libunit-wasm
+%endif"""
+
+SPEC_LIBUNIT_WASM_BUILD_DISABLED = """# COPR: libunit-wasm disabled (needs wasi-sysroot)
+# %if (0%{?fedora}) || (0%{?rhel} >= 8) || (0%{?amzn2})
+# %{__make} %{?_smp_mflags} -C pkg/contrib .libunit-wasm
+# %endif"""
+
+SPEC_LIBUNIT_WASM_INSTALL = """%if (0%{?fedora}) || (0%{?rhel} >= 8) || (0%{?amzn2})
+%{__mkdir} -p %{buildroot}%{_includedir}/unit/
+%{__install} -m 644 pkg/contrib/libunit-wasm/src/c/libunit-wasm.a %{buildroot}%{_libdir}/
+%{__install} -m 644 pkg/contrib/libunit-wasm/src/c/include/unit/unit-wasm.h %{buildroot}%{_includedir}/unit/
+%endif"""
+
+SPEC_LIBUNIT_WASM_INSTALL_DISABLED = """# COPR: libunit-wasm install disabled (needs wasi-sysroot)
+# %if (0%{?fedora}) || (0%{?rhel} >= 8) || (0%{?amzn2})
+# %{__mkdir} -p %{buildroot}%{_includedir}/unit/
+# %{__install} -m 644 pkg/contrib/libunit-wasm/src/c/libunit-wasm.a %{buildroot}%{_libdir}/
+# %{__install} -m 644 pkg/contrib/libunit-wasm/src/c/include/unit/unit-wasm.h %{buildroot}%{_includedir}/unit/
+# %endif"""
+
 
 def _find_active(haystack: str, needle: str) -> int:
     """Index of needle on a Makefile line whose first non-whitespace char is not '#'."""
@@ -103,17 +128,51 @@ def patch_contrib_makefile(cm: Path) -> None:
     cm.write_text(txt, encoding="utf-8")
 
 
+def _comment_pkgs_line(mf: Path, pkg_line: str, reason: str) -> None:
+    txt = mf.read_text(encoding="utf-8")
+    if WASI_SKIP_MARKER in txt:
+        return
+    if pkg_line not in txt:
+        sys.exit(f"{mf}: expected {pkg_line!r}")
+    block = f"{WASI_SKIP_MARKER} ({reason})\n# {pkg_line}\n"
+    mf.write_text(txt.replace(pkg_line + "\n", block, 1), encoding="utf-8")
+
+
+def patch_disable_wasi_contrib(worktree: Path) -> None:
+    _comment_pkgs_line(
+        worktree / "pkg/contrib/src/wasi-sysroot/Makefile",
+        "PKGS += wasi-sysroot",
+        "SHA512 mismatch on upstream tarball",
+    )
+    _comment_pkgs_line(
+        worktree / "pkg/contrib/src/libunit-wasm/Makefile",
+        "PKGS += libunit-wasm",
+        "depends on wasi-sysroot",
+    )
+
+
 def patch_spec(si: Path) -> None:
     txt = si.read_text(encoding="utf-8")
     needle = "%{__make} %{?_smp_mflags} -C pkg/contrib .njs"
     guard = "export SKIP_CONTRIB_NET=1\n"
-    if guard in txt:
-        return
-    pair = "%build\n" + needle
-    if pair not in txt:
-        sys.exit(f"{si}: missing %%build / contrib .njs block")
-    ins = "%build\n# Bundled contrib tarballs under %%{SOURCE0}; mock has no network.\n" + guard + "\n" + needle
-    si.write_text(txt.replace(pair, ins, 1), encoding="utf-8")
+    if guard not in txt:
+        pair = "%build\n" + needle
+        if pair not in txt:
+            sys.exit(f"{si}: missing %%build / contrib .njs block")
+        ins = (
+            "%build\n# Bundled contrib tarballs under %%{SOURCE0}; mock has no network.\n"
+            + guard
+            + "\n"
+            + needle
+        )
+        txt = txt.replace(pair, ins, 1)
+
+    if SPEC_LIBUNIT_WASM_BUILD in txt:
+        txt = txt.replace(SPEC_LIBUNIT_WASM_BUILD, SPEC_LIBUNIT_WASM_BUILD_DISABLED, 1)
+    if SPEC_LIBUNIT_WASM_INSTALL in txt:
+        txt = txt.replace(SPEC_LIBUNIT_WASM_INSTALL, SPEC_LIBUNIT_WASM_INSTALL_DISABLED, 1)
+
+    si.write_text(txt, encoding="utf-8")
 
 
 def main() -> None:
@@ -123,6 +182,7 @@ def main() -> None:
         if not p.is_file():
             sys.exit(f"missing: {p}")
     patch_contrib_makefile(contrib)
+    patch_disable_wasi_contrib(ROOT)
     patch_spec(spec)
 
 
