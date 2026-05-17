@@ -73,6 +73,10 @@ SPEC_LIBUNIT_WASM_INSTALL_DISABLED = """# COPR: libunit-wasm install disabled (n
 # %{__install} -m 644 pkg/contrib/libunit-wasm/src/c/include/unit/unit-wasm.h %{buildroot}%{_includedir}/unit/
 # %endif"""
 
+RUST_OTEL_MARKER = "# COPR: rust for configure --otel"
+RUST_BUILD_REQUIRES = """BuildRequires: rust
+BuildRequires: cargo"""
+
 
 def _find_active(haystack: str, needle: str) -> int:
     """Index of needle on a Makefile line whose first non-whitespace char is not '#'."""
@@ -171,6 +175,16 @@ def patch_spec(si: Path) -> None:
         txt = txt.replace(SPEC_LIBUNIT_WASM_BUILD, SPEC_LIBUNIT_WASM_BUILD_DISABLED, 1)
     if SPEC_LIBUNIT_WASM_INSTALL in txt:
         txt = txt.replace(SPEC_LIBUNIT_WASM_INSTALL, SPEC_LIBUNIT_WASM_INSTALL_DISABLED, 1)
+
+    if RUST_OTEL_MARKER not in txt:
+        anchor = "BuildRequires: llvm\n"
+        if anchor not in txt:
+            sys.exit(f"{si}: expected {anchor!r} for rust BuildRequires")
+        txt = txt.replace(
+            anchor,
+            anchor + RUST_OTEL_MARKER + "\n" + RUST_BUILD_REQUIRES + "\n",
+            1,
+        )
 
     si.write_text(txt, encoding="utf-8")
 
