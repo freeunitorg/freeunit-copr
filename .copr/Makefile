@@ -49,10 +49,20 @@ srpm:
 	rm -rf "$(BUILD_DIR)"
 	mkdir -p "$(BUILD_DIR)"
 
-	dnf -y install git libxml2 libxslt xz curl wget python3
+	dnf -y install git libxml2 libxslt xz curl wget python3 rust cargo
 	git clone --depth 1 --branch "$(UPSTREAM_GIT_REF)" "$(UPSTREAM_REPO)" "$(WORKTREE)"
 	mkdir -p "$(WORKTREE)/pkg/contrib/tarballs"
 	python3 "$(TOPDIR)/.copr/patch_upstream.py" "$(WORKTREE)"
+	@echo "Vendoring src/otel crates for offline mock %build..."
+	cd "$(WORKTREE)/src/otel" && cargo vendor vendor
+	mkdir -p "$(WORKTREE)/src/otel/.cargo"
+	printf '%s\n' \
+		'[source.crates-io]' \
+		'replace-with = "vendored-sources"' \
+		'' \
+		'[source.vendored-sources]' \
+		'directory = "vendor"' \
+		> "$(WORKTREE)/src/otel/.cargo/config.toml"
 	python3 "$(TOPDIR)/.copr/gen_contrib_fetch.py" --worktree "$(WORKTREE)" --out "$(BUILD_DIR)/contrib-fetch.sh"
 	bash "$(BUILD_DIR)/contrib-fetch.sh" "$(WORKTREE)"
 	$(MAKE) -C "$(WORKTREE)/pkg/contrib" fetch

@@ -77,6 +77,9 @@ RUST_OTEL_MARKER = "# COPR: rust for configure --otel"
 RUST_BUILD_REQUIRES = """BuildRequires: rust
 BuildRequires: cargo"""
 
+CARGO_OFFLINE_MARKER = "# COPR: vendored src/otel (SRPM cargo vendor); mock has no network"
+CARGO_OFFLINE_EXPORT = "export CARGO_NET_OFFLINE=1"
+
 
 def _find_active(haystack: str, needle: str) -> int:
     """Index of needle on a Makefile line whose first non-whitespace char is not '#'."""
@@ -166,10 +169,15 @@ def patch_spec(si: Path) -> None:
         ins = (
             "%build\n# Bundled contrib tarballs under %%{SOURCE0}; mock has no network.\n"
             + guard
+            + CARGO_OFFLINE_MARKER
             + "\n"
+            + CARGO_OFFLINE_EXPORT
+            + "\n\n"
             + needle
         )
         txt = txt.replace(pair, ins, 1)
+    elif CARGO_OFFLINE_MARKER not in txt:
+        txt = txt.replace(guard, guard + CARGO_OFFLINE_MARKER + "\n" + CARGO_OFFLINE_EXPORT + "\n", 1)
 
     if SPEC_LIBUNIT_WASM_BUILD in txt:
         txt = txt.replace(SPEC_LIBUNIT_WASM_BUILD, SPEC_LIBUNIT_WASM_BUILD_DISABLED, 1)
