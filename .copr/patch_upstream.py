@@ -78,7 +78,11 @@ RUST_BUILD_REQUIRES = """BuildRequires: rust
 BuildRequires: cargo"""
 
 CARGO_OFFLINE_MARKER = "# COPR: vendored src/otel (SRPM cargo vendor); mock has no network"
-CARGO_OFFLINE_EXPORT = "export CARGO_NET_OFFLINE=1"
+CARGO_OFFLINE_EXPORT = "export CARGO_NET_OFFLINE=true"
+
+OTEL_CARGO_OFFLINE_MARKER = "# COPR: cargo --offline (vendored src/otel)"
+CARGO_RUSTC_NEEDLE = "cargo rustc \\$(RUST_FLAGS)"
+CARGO_RUSTC_REPL = "cargo rustc --offline --locked \\$(RUST_FLAGS)"
 
 
 def _find_active(haystack: str, needle: str) -> int:
@@ -194,18 +198,34 @@ def patch_spec(si: Path) -> None:
             1,
         )
 
+    txt = txt.replace("export CARGO_NET_OFFLINE=1\n", CARGO_OFFLINE_EXPORT + "\n")
+
     si.write_text(txt, encoding="utf-8")
+
+
+def patch_otel_auto_make(am: Path) -> None:
+    txt = am.read_text(encoding="utf-8")
+    if OTEL_CARGO_OFFLINE_MARKER in txt:
+        return
+    if CARGO_RUSTC_NEEDLE not in txt:
+        sys.exit(f"{am}: expected otel {CARGO_RUSTC_NEEDLE!r} in auto/make")
+    if CARGO_RUSTC_REPL in txt:
+        return
+    txt = txt.replace(CARGO_RUSTC_NEEDLE, CARGO_RUSTC_REPL, 1)
+    am.write_text(txt, encoding="utf-8")
 
 
 def main() -> None:
     contrib = ROOT / "pkg/contrib/Makefile"
     spec = ROOT / "pkg/rpm/unit.spec.in"
-    for p in (contrib, spec):
+    auto_make = ROOT / "auto/make"
+    for p in (contrib, spec, auto_make):
         if not p.is_file():
             sys.exit(f"missing: {p}")
     patch_contrib_makefile(contrib)
     patch_disable_wasi_contrib(ROOT)
     patch_spec(spec)
+    patch_otel_auto_make(auto_make)
 
 
 if __name__ == "__main__":
